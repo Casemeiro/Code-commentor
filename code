@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Code Commenter</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-mono, monospace); background: #0d1117; color: #e6edf3; min-height: 100vh; display: flex; flex-direction: column; }
+  .header { padding: 1rem 1.5rem; border-bottom: 0.5px solid #30363d; display: flex; align-items: center; justify-content: space-between; background: #161b22; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 28px; height: 28px; background: #7f77dd; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-family: var(--font-mono); font-weight: 700; color: #eeedfe; }
+  .logo-text { font-size: 15px; font-weight: 500; color: #e6edf3; font-family: var(--font-sans, sans-serif); }
+  .logo-sub { font-size: 12px; color: #8b949e; font-family: var(--font-sans, sans-serif); }
+  .lang-select { background: #21262d; border: 0.5px solid #30363d; border-radius: 6px; color: #e6edf3; font-size: 13px; padding: 6px 10px; cursor: pointer; font-family: var(--font-sans, sans-serif); }
+  .main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; height: calc(100vh - 120px); }
+  .panel { display: flex; flex-direction: column; }
+  .panel-header { padding: 10px 16px; background: #161b22; border-bottom: 0.5px solid #30363d; display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 12px; color: #8b949e; font-family: var(--font-sans, sans-serif); text-transform: uppercase; letter-spacing: 0.05em; }
+  .panel-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .badge-input { background: #1f2937; color: #93c5fd; border: 0.5px solid #1e3a5f; }
+  .badge-output { background: #14532d; color: #86efac; border: 0.5px solid #166534; }
+  .left-panel { border-right: 0.5px solid #30363d; }
+  textarea { flex: 1; background: #0d1117; color: #e6edf3; border: none; outline: none; resize: none; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.7; padding: 16px; tab-size: 2; }
+  textarea::placeholder { color: #484f58; }
+  .output-area { flex: 1; overflow-y: auto; padding: 16px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .line { display: block; }
+  .comment { color: #6e9d44; }
+  .code-text { color: #e6edf3; }
+  .placeholder-msg { color: #484f58; font-family: var(--font-sans, sans-serif); font-size: 13px; padding-top: 8px; }
+  .footer { padding: 12px 16px; border-top: 0.5px solid #30363d; background: #161b22; display: flex; align-items: center; gap: 12px; }
+  .btn-comment { background: #7f77dd; color: #fff; border: none; border-radius: 6px; padding: 9px 20px; font-size: 13px; font-family: var(--font-sans, sans-serif); font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-comment:hover { background: #6b63c9; }
+  .btn-comment:disabled { background: #3c3566; color: #9084e0; cursor: not-allowed; }
+  .btn-copy { background: transparent; color: #8b949e; border: 0.5px solid #30363d; border-radius: 6px; padding: 9px 16px; font-size: 13px; font-family: var(--font-sans, sans-serif); cursor: pointer; transition: all 0.15s; }
+  .btn-copy:hover { background: #21262d; color: #e6edf3; }
+  .btn-copy:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-clear { background: transparent; color: #8b949e; border: none; font-size: 13px; font-family: var(--font-sans, sans-serif); cursor: pointer; margin-left: auto; }
+  .btn-clear:hover { color: #e6edf3; }
+  .status { font-size: 12px; color: #8b949e; font-family: var(--font-sans, sans-serif); display: flex; align-items: center; gap: 6px; }
+  .spinner { width: 12px; height: 12px; border: 2px solid #30363d; border-top-color: #7f77dd; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+  .spinner.active { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .divider { width: 0.5px; background: #30363d; }
+  .error-msg { color: #f97583; font-family: var(--font-sans, sans-serif); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">//</div>
+    <div>
+      <div class="logo-text">AI Code Commenter</div>
+      <div class="logo-sub">Paste code — get inline comments</div>
+    </div>
+  </div>
+  <select class="lang-select" id="langSelect">
+    <option value="auto">Auto-detect language</option>
+    <option value="Python">Python</option>
+    <option value="JavaScript">JavaScript</option>
+    <option value="TypeScript">TypeScript</option>
+    <option value="Java">Java</option>
+    <option value="C++">C++</option>
+    <option value="C">C</option>
+    <option value="C#">C#</option>
+    <option value="Go">Go</option>
+    <option value="Rust">Rust</option>
+    <option value="Ruby">Ruby</option>
+    <option value="PHP">PHP</option>
+    <option value="Swift">Swift</option>
+    <option value="Kotlin">Kotlin</option>
+    <option value="Bash">Bash</option>
+    <option value="SQL">SQL</option>
+  </select>
+</div>
+
+<div class="main">
+  <div class="panel left-panel">
+    <div class="panel-header">
+      <span class="panel-title">Input</span>
+      <span class="panel-badge badge-input">original code</span>
+    </div>
+    <textarea id="codeInput" placeholder="// Paste your code here...&#10;&#10;function fibonacci(n) {&#10;  if (n <= 1) return n;&#10;  return fibonacci(n - 1) + fibonacci(n - 2);&#10;}"></textarea>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Output</span>
+      <span class="panel-badge badge-output">commented code</span>
+    </div>
+    <div class="output-area" id="outputArea">
+      <span class="placeholder-msg">Your commented code will appear here...</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn-comment" id="commentBtn" onclick="addComments()">Add Comments</button>
+  <button class="btn-copy" id="copyBtn" disabled onclick="copyOutput()">Copy</button>
+  <div class="status">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusText"></span>
+  </div>
+  <button class="btn-clear" onclick="clearAll()">Clear</button>
+</div>
+
+<script>
+let commentedCode = '';
+
+async function addComments() {
+  const code = document.getElementById('codeInput').value.trim();
+  if (!code) { setStatus('Paste some code first.', false); return; }
+
+  const lang = document.getElementById('langSelect').value;
+  const langHint = lang === 'auto' ? '' : ` The language is ${lang}.`;
+
+  setLoading(true);
+  setStatus('Analyzing...', true);
+  document.getElementById('outputArea').innerHTML = '';
+
+  const prompt = `You are a code documentation expert. Add clear, concise inline comments to EVERY meaningful line of the following code.${langHint}
+
+Rules:
+- Add a comment to every non-trivial line of code
+- Comments should explain WHAT and WHY, not just restate the code
+- Keep existing comments but improve them if needed
+- Preserve the exact original code, only add/improve comments
+- Use the correct comment syntax for the language
+- Return ONLY the commented code, no explanation, no markdown fences
+
+Code:
+${code}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const text = data.content.map(b => b.text || '').join('');
+    commentedCode = text;
+    renderOutput(text);
+    setStatus('Done — ' + countComments(text) + ' comments added', false);
+    document.getElementById('copyBtn').disabled = false;
+  } catch (e) {
+    document.getElementById('outputArea').innerHTML = `<span class="error-msg">Error: ${e.message}</span>`;
+    setStatus('', false);
+  }
+
+  setLoading(false);
+}
+
+function renderOutput(code) {
+  const lines = code.split('\n');
+  const out = document.getElementById('outputArea');
+  out.innerHTML = '';
+  lines.forEach(line => {
+    const span = document.createElement('span');
+    span.className = 'line';
+    const trimmed = line.trim();
+    const isComment = trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('--') || trimmed.startsWith('<!--');
+    if (isComment) {
+      span.className = 'line comment';
+      span.textContent = line || ' ';
+    } else {
+      const commentIdx = findInlineComment(line);
+      if (commentIdx > -1) {
+        const codePart = document.createElement('span');
+        codePart.className = 'code-text';
+        codePart.textContent = line.substring(0, commentIdx);
+        const cmtPart = document.createElement('span');
+        cmtPart.className = 'comment';
+        cmtPart.textContent = line.substring(commentIdx);
+        span.appendChild(codePart);
+        span.appendChild(cmtPart);
+      } else {
+        span.className = 'line code-text';
+        span.textContent = line || ' ';
+      }
+    }
+    out.appendChild(span);
+  });
+}
+
+function findInlineComment(line) {
+  const markers = ['//', '#', '--'];
+  let idx = -1;
+  for (const m of markers) {
+    const i = line.indexOf(m);
+    if (i > 0) { idx = idx === -1 ? i : Math.min(idx, i); }
+  }
+  return idx;
+}
+
+function countComments(code) {
+  return (code.match(/(\/\/|#|--).+/g) || []).length;
+}
+
+function setLoading(on) {
+  document.getElementById('commentBtn').disabled = on;
+  document.getElementById('spinner').classList.toggle('active', on);
+}
+
+function setStatus(msg, loading) {
+  document.getElementById('statusText').textContent = msg;
+}
+
+function copyOutput() {
+  if (!commentedCode) return;
+  navigator.clipboard.writeText(commentedCode).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function clearAll() {
+  document.getElementById('codeInput').value = '';
+  document.getElementById('outputArea').innerHTML = '<span class="placeholder-msg">Your commented code will appear here...</span>';
+  commentedCode = '';
+  document.getElementById('copyBtn').disabled = true;
+  setStatus('', false);
+}
+</script>
+</body>
+</html>
